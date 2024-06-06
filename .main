@@ -1,1 +1,187 @@
+import pygame
+import time
+import sys
+import random
+import os
+from pygame.locals import *
 
+# Inicjalizacja Pygame
+pygame.init()
+
+# Ustawienia okna gry
+ORIGINAL_WIDTH, ORIGINAL_HEIGHT = 960, 540
+SCALE_FACTOR = 1.5  # Faktor skalowania
+WIDTH, HEIGHT = int(ORIGINAL_WIDTH * SCALE_FACTOR), int(ORIGINAL_HEIGHT * SCALE_FACTOR)  # Nowy rozmiar okna
+screen = pygame.display.set_mode((WIDTH, HEIGHT))
+pygame.display.set_caption("Wisielec")
+
+# Kolory
+WHITE = (255, 255, 255)
+BLACK = (0, 0, 0)
+
+# Czcionki
+btn_font = pygame.font.SysFont('calibri', int(20 * SCALE_FACTOR))
+letter_font = pygame.font.SysFont('calibri', int(60 * SCALE_FACTOR))
+game_font = pygame.font.SysFont('calibri', int(80 * SCALE_FACTOR))
+small_font = pygame.font.SysFont('calibri', int(20 * SCALE_FACTOR))
+
+# Obrazy
+IMAGES = []
+hangman_status = 0
+for i in range(6):
+    image = pygame.image.load(os.path.join("images", f"wisielec_{i}.bmp"))
+    IMAGES.append(pygame.transform.scale(image, (int(image.get_width() * SCALE_FACTOR), int(image.get_height() * SCALE_FACTOR))))
+
+# Przyciski
+ROWS = 2
+COLS = 13
+GAP = 20
+SIZE = int(40 * SCALE_FACTOR)
+BOXES = []
+
+for row in range(ROWS):
+    for col in range(COLS):
+        x = ((GAP * col) + GAP) + (SIZE * col)
+        y = ((GAP * row) + GAP) + (SIZE * row) + int(330 * SCALE_FACTOR)
+        box = pygame.Rect(x, y, SIZE, SIZE)
+        BOXES.append(box)
+
+A = 65
+BUTTONS = []
+for ind, box in enumerate(BOXES):
+    letter = chr(A + ind)
+    button = ([box, letter])
+    BUTTONS.append(button)
+
+# Funkcje pomocnicze
+def draw_btns(BUTTONS):
+    for button, letter in BUTTONS:
+        btn_text = btn_font.render(letter, True, WHITE)
+        btn_text_rect = btn_text.get_rect(center=(button.x + SIZE // 2, button.y + SIZE // 2))
+        pygame.draw.rect(screen, WHITE, button, 2)
+        screen.blit(btn_text, btn_text_rect)
+
+def display_guess():
+    display_word = ''
+    for letter in WORD:
+        if letter in GUESSED:
+            display_word += f"{letter} "
+        else:
+            display_word += "_ "
+    text = letter_font.render(display_word, True, WHITE)
+    screen.blit(text, (int(400 * SCALE_FACTOR), int(200 * SCALE_FACTOR)))
+
+def welcome_screen():
+    screen.fill(BLACK)
+    title_text = game_font.render("Wisielec", True, WHITE)
+    title_text_rect = title_text.get_rect(center=(int(WIDTH // 2), int(title_text.get_height() // 2 + 50 * SCALE_FACTOR)))
+    screen.blit(title_text, title_text_rect)
+
+    # Dodanie napisu "1LO Gliwice" pod przyciskiem "Start"
+    school_text = game_font.render("1 LO Gliwice", True, WHITE)
+    school_text_rect = school_text.get_rect(center=(int(WIDTH // 2), int(HEIGHT // 2 + 150 * SCALE_FACTOR)))
+    screen.blit(school_text, school_text_rect)
+
+    start_button = pygame.Rect(int(WIDTH // 2 - 100 * SCALE_FACTOR), int(HEIGHT // 2 - 50 * SCALE_FACTOR),
+                               int(200 * SCALE_FACTOR), int(100 * SCALE_FACTOR))
+    pygame.draw.rect(screen, WHITE, start_button, 2)
+    start_text = game_font.render("Start", True, WHITE)
+    start_text_rect = start_text.get_rect(center=start_button.center)
+    screen.blit(start_text, start_text_rect)
+
+    pygame.display.update()
+
+    while True:
+        for event in pygame.event.get():
+            if event.type == QUIT:
+                pygame.quit()
+                sys.exit()
+            elif event.type == MOUSEBUTTONDOWN:
+                if start_button.collidepoint(event.pos):
+                    return "game"
+
+def start_game():
+    # Wybór hasła
+    user_input = ''
+    while True:
+        for event in pygame.event.get():
+            if event.type == QUIT:
+                pygame.quit()
+                sys.exit()
+            elif event.type == KEYDOWN:
+                if event.key == K_RETURN:
+                    return user_input.upper()[:8]  # Konwertuj wpisane litery na duże litery i ogranicz do 8 znaków
+                elif event.key == K_BACKSPACE:
+                    user_input = user_input[:-1]
+                else:
+                    user_input += event.unicode.upper()  # Zamień małe litery na duże
+
+        screen.fill(BLACK)
+        input_text = small_font.render("Wprowadź hasło (max 8 znaków):", True, WHITE)
+        input_text_rect = input_text.get_rect(center=(int(WIDTH // 2), int(HEIGHT // 2 - 20 * SCALE_FACTOR)))
+        screen.blit(input_text, input_text_rect)
+        input_text = small_font.render(user_input[:8], True, WHITE)
+        input_text_rect = input_text.get_rect(center=(int(WIDTH // 2), int(HEIGHT // 2 + 20 * SCALE_FACTOR)))
+        screen.blit(input_text, input_text_rect)
+        pygame.display.update()
+
+# Ekran powitalny
+screen_type = welcome_screen()
+
+# Zmienna informująca o zakończeniu gry
+game_over = False
+
+# Uruchomienie gry
+if screen_type == "game":
+    WORD = start_game()
+    GUESSED = []
+
+    # Pętla gry
+    while True:
+        for event in pygame.event.get():
+            if event.type == QUIT:
+                pygame.quit()
+                sys.exit()
+
+            if event.type == MOUSEBUTTONDOWN:
+                clicked_pos = event.pos
+
+                for button, letter in BUTTONS:
+                    if button.collidepoint(clicked_pos):
+                        GUESSED.append(letter)
+
+                        if letter not in WORD:
+                            hangman_status += 1
+
+                        if hangman_status == 5:
+                            game_over = True
+
+                        BUTTONS.remove([button, letter])
+
+        screen.fill(BLACK)
+        screen.blit(IMAGES[hangman_status], (int(150 * SCALE_FACTOR), int(100 * SCALE_FACTOR)))
+        draw_btns(BUTTONS)
+        display_guess()
+
+        won = True
+        for letter in WORD:
+            if letter not in GUESSED:
+                won = False
+
+        if won:
+            game_over = True
+            display_text = 'Wygrałeś!'
+        else:
+            display_text = 'Przegrałeś!'
+
+        pygame.display.update()
+
+        if game_over:
+            screen.fill(BLACK)
+            game_over_text = game_font.render(display_text, True, WHITE)
+            game_over_text_rect = game_over_text.get_rect(center=(int(WIDTH // 2), int(HEIGHT // 2)))
+            screen.blit(game_over_text, game_over_text_rect)
+            pygame.display.update()
+            pygame.time.delay(3000)
+            pygame.quit()
+            sys.exit()
